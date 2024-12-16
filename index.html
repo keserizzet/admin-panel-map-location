@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Paneli: Konum Ekleme</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* Görsel Konteyner */
+    .image-container {
+      position: relative;
+      width: 100%;
+      max-width: 900px;
+      height: auto;
+      margin: 20px auto;
+      border: 2px solid #ccc;
+    }
+
+    .image-container img {
+      width: 100%;
+      display: block;
+    }
+
+    /* GPS Simge */
+    .gps-marker {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      cursor: grab;
+      user-select: none;
+      transform: translate(-50%, -50%);
+    }
+
+    .gps-marker svg {
+      width: 40px;
+      height: 40px;
+      fill: #ff5733;
+    }
+
+    /* Admin Paneli */
+    .admin-panel {
+      margin: 20px auto;
+      text-align: center;
+    }
+
+    .coordinates {
+      margin-top: 10px;
+      font-size: 16px;
+    }
+
+    .add-marker-btn {
+      margin-top: 10px;
+      padding: 10px 20px;
+      cursor: pointer;
+      background-color: #ff5733;
+      color: white;
+      border: none;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<h1 style="text-align: center;">Admin Paneli: Görsel Üzerine Konum Ekleme</h1>
+
+<!-- Resim Konteyneri -->
+<div class="image-container" id="image-container">
+  <img src="./assets/img/narvenkasaba.jpg" alt="Harita Görseli">
+</div>
+
+<!-- Admin Paneli -->
+<div class="admin-panel">
+  <button class="add-marker-btn" id="add-marker-btn">Konum Ekle</button>
+  <div class="coordinates" id="coordinates">Koordinatlar: (left: 0, top: 0)</div>
+</div>
+
+<script>
+  const imageContainer = document.getElementById("image-container");
+  const addMarkerBtn = document.getElementById("add-marker-btn");
+  const coordinatesDisplay = document.getElementById("coordinates");
+
+  let dragging = null;
+
+  // Konum ekleme butonuna tıklama
+  addMarkerBtn.addEventListener("click", () => {
+    const marker = document.createElement("div");
+    marker.classList.add("gps-marker");
+
+    // GPS SVG simgesi
+    marker.innerHTML = `
+      <svg viewBox="0 0 24 24">
+        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5 14.5 7.62 14.5 9 13.38 11.5 12 11.5z"/>
+      </svg>
+    `;
+
+    // İlk konumu merkeze yerleştir
+    marker.style.left = "50%";
+    marker.style.top = "50%";
+
+    // Sürükleme işlemleri
+    marker.addEventListener("mousedown", (e) => {
+      dragging = marker;
+      dragging.style.cursor = "grabbing";
+    });
+
+    // Fare hareketiyle konumu güncelle
+    document.addEventListener("mousemove", (e) => {
+      if (dragging) {
+        const rect = imageContainer.getBoundingClientRect();
+        let x = ((e.clientX - rect.left) / rect.width) * 100;
+        let y = ((e.clientY - rect.top) / rect.height) * 100;
+
+        // Sınırları kontrol et
+        x = Math.max(0, Math.min(100, x));
+        y = Math.max(0, Math.min(100, y));
+
+        dragging.style.left = x + "%";
+        dragging.style.top = y + "%";
+
+        // Koordinatları göster
+        coordinatesDisplay.textContent = `Koordinatlar: (left: ${x.toFixed(2)}%, top: ${y.toFixed(2)}%)`;
+      }
+    });
+
+    // Sürüklemeyi bırakma
+    document.addEventListener("mouseup", () => {
+      if (dragging) {
+        dragging.style.cursor = "grab";
+        dragging = null;
+      }
+    });
+
+    // Görsel konteynerine marker ekle
+    imageContainer.appendChild(marker);
+  });
+</script>
+
+</body>
+</html>
