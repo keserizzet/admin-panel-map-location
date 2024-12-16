@@ -5,7 +5,408 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Paneli: Konum Ekleme</title>
   <style>
-    /* Mevcut CSS kodları */
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    .image-container {
+      position: relative;
+      width: 100%;
+      max-width: 900px;
+      height: auto;
+      margin: 20px auto;
+      border: 2px solid #ccc;
+    }
+
+    .image-container img {
+      width: 100%;
+      display: block;
+    }
+
+    .gps-marker {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      cursor: grab;
+      user-select: none;
+      transform: translate(-50%, -50%);
+    }
+
+    .gps-marker svg {
+      width: 40px;
+      height: 40px;
+      fill: #ff5733;
+    }
+
+    .admin-panel {
+      margin: 20px auto;
+      text-align: center;
+    }
+
+    .coordinates {
+      margin-top: 10px;
+      font-size: 16px;
+    }
+
+    .add-marker-btn, .add-image-btn {
+      margin: 10px;
+      padding: 10px 20px;
+      cursor: pointer;
+      background-color: #ff5733;
+      color: white;
+      border: none;
+      font-size: 16px;
+    }
+
+    .popup {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 800px;
+      max-width: 90%;
+      padding: 20px;
+      background-color: white;
+      border: 2px solid #ccc;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      display: none;
+      height: 600px;
+      max-height: 90%;
+      overflow-y: auto;
+    }
+
+    .popup-kaydet {
+      position: relative;
+      top: 50px;
+    }
+
+    .popup img {
+      width: 100%;
+      margin-bottom: 10px;
+    }
+
+    .popup .close-btn {
+      cursor: pointer;
+      background-color: red;
+      color: white;
+      padding: 5px 10px;
+      border: none;
+      float: right;
+    }
+
+    .image-preview {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    @media (max-width: 768px) {
+      .admin-panel {
+        padding: 10px;
+      }
+
+      .add-marker-btn, .add-image-btn {
+        font-size: 14px;
+        padding: 8px 16px;
+      }
+
+      .popup {
+        width: 100%;
+        height: auto;
+        padding: 10px;
+        height: 50%;
+      }
+
+      .popup .close-btn {
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<h1 style="text-align: center;">Admin Paneli: Görsel Üzerine Konum Ekleme</h1>
+
+<!-- Resim Yükleme -->
+<div class="admin-panel">
+  <input type="file" id="image-input" accept="image/*" style="display: none;">
+  <button class="add-image-btn" id="upload-image-btn">Yeni Resim Yükle</button>
+  <button class="add-image-btn" id="remove-image-btn">Resmi Kaldır</button>
+</div>
+
+<!-- Resim Konteyneri -->
+<div class="image-container" id="image-container">
+  <img src="" alt="Harita Görseli" id="current-image">
+</div>
+
+<!-- Admin Paneli -->
+<div class="admin-panel">
+  <button class="add-marker-btn" id="add-marker-btn" disabled>Konum Ekle</button>
+  <button class="add-image-btn" id="save-map-btn" disabled>Haritayı Kaydet</button>
+  <div class="coordinates" id="coordinates">Koordinatlar: (left: 0, top: 0)</div>
+</div>
+
+<!-- Popup -->
+<div class="popup" id="popup">
+  <button class="close-btn" id="close-popup">X</button>
+  <textarea id="popup-description" placeholder="Açıklama ekle" rows="4" style="width: 100%; margin-bottom: 10px;"></textarea>
+  
+  <div>
+    <input type="file" id="popup-image-input" accept="image/*" style="display: none;">
+    <button class="add-image-btn" id="upload-popup-image" style="margin-bottom: 10px;">Resim Ekle</button>
+  </div>
+  
+  <div class="image-preview" id="image-preview"></div>
+  
+  <button class="add-image-btn popup-kaydet" id="save-popup">Kaydet</button>
+</div>
+
+<script>
+  const imageContainer = document.getElementById("image-container");
+  const addMarkerBtn = document.getElementById("add-marker-btn");
+  const uploadImageBtn = document.getElementById("upload-image-btn");
+  const removeImageBtn = document.getElementById("remove-image-btn");
+  const imageInput = document.getElementById("image-input");
+  const coordinatesDisplay = document.getElementById("coordinates");
+  const popup = document.getElementById("popup");
+  const popupDescription = document.getElementById("popup-description");
+  const closePopup = document.getElementById("close-popup");
+  const savePopup = document.getElementById("save-popup");
+  const currentImage = document.getElementById("current-image");
+  const popupImageInput = document.getElementById("popup-image-input");
+  const uploadPopupImage = document.getElementById("upload-popup-image");
+  const imagePreview = document.getElementById("image-preview");
+  const saveMapBtn = document.getElementById("save-map-btn");
+
+  let dragging = null;
+  let activeMarker = null;
+  let markerImages = new Map(); // Store images and descriptions for each marker
+
+  uploadImageBtn.addEventListener("click", () => {
+    imageInput.click();
+  });
+
+  imageInput.addEventListener("change", () => {
+    const file = imageInput.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        currentImage.src = e.target.result;
+        addMarkerBtn.disabled = false;
+        saveMapBtn.disabled = false;
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+
+  removeImageBtn.addEventListener("click", () => {
+    currentImage.src = "";
+    addMarkerBtn.disabled = true;
+    saveMapBtn.disabled = true;
+  });
+
+  addMarkerBtn.addEventListener("click", () => {
+    if (!currentImage.src) {
+      alert("Lütfen önce bir harita görseli yükleyin.");
+      return;
+    }
+
+    const marker = document.createElement("div");
+    marker.classList.add("gps-marker");
+
+    marker.innerHTML = `
+      <svg viewBox="0 0 24 24">
+        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5 14.5 7.62 14.5 9 13.38 11.5 12 11.5z"/>
+      </svg>
+    `;
+
+    marker.style.left = "50%";
+    marker.style.top = "50%";
+
+    marker.addEventListener("mousedown", (e) => {
+      dragging = marker;
+      dragging.style.cursor = "grabbing";
+    });
+
+    marker.addEventListener("touchstart", (e) => {
+      dragging = marker;
+      dragging.style.cursor = "grabbing";
+    });
+
+    marker.addEventListener("click", () => {
+      activeMarker = marker;
+      const data = markerImages.get(marker) || { description: "", images: [] };
+
+      popupDescription.value = data.description;
+      imagePreview.innerHTML = "";
+
+      data.images.forEach((image, index) => {
+        const imageDiv = document.createElement("div");
+        imageDiv.style.position = "relative";
+        imageDiv.style.width = "80px";
+        imageDiv.style.marginBottom = "10px";
+
+        imageDiv.innerHTML = `
+          <img src="${image.src}" style="width: 100%; height: 100%; object-fit: cover;">
+          <button style="position: absolute; top: 0; right: 0; background-color: red; color: white; border: none; font-size: 12px; cursor: pointer;">X</button>
+          <textarea placeholder="Fotoğraf açıklaması" style="width: 100%; margin-top: 5px;">${image.description || ""}</textarea>
+        `;
+
+        const removeButton = imageDiv.querySelector("button");
+        removeButton.addEventListener("click", () => {
+          data.images.splice(index, 1);
+          imageDiv.remove();
+        });
+
+        const descriptionField = imageDiv.querySelector("textarea");
+        descriptionField.addEventListener("input", (e) => {
+          data.images[index].description = e.target.value;
+        });
+
+        imagePreview.appendChild(imageDiv);
+      });
+
+      popup.style.display = "block";
+    });
+
+    document.addEventListener("mousemove", handleDragMove);
+    document.addEventListener("mouseup", handleDragEnd);
+    document.addEventListener("touchmove", handleDragMove, { passive: false });
+    document.addEventListener("touchend", handleDragEnd);
+
+    imageContainer.appendChild(marker);
+    markerImages.set(marker, { description: "", images: [] });
+  });
+
+  closePopup.addEventListener("click", () => {
+    popup.style.display = "none";
+  });
+
+  savePopup.addEventListener("click", () => {
+    if (activeMarker) {
+      const data = markerImages.get(activeMarker);
+      data.description = popupDescription.value;
+    }
+    popup.style.display = "none";
+  });
+
+  uploadPopupImage.addEventListener("click", () => {
+    const data = markerImages.get(activeMarker);
+    if (data.images.length >= 5) {
+      alert("En fazla 5 resim ekleyebilirsiniz.");
+      return;
+    }
+    popupImageInput.click();
+  });
+
+  popupImageInput.addEventListener("change", () => {
+    const file = popupImageInput.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const imageSrc = e.target.result;
+        const data = markerImages.get(activeMarker);
+        if (data.images.length >= 5) {
+          alert("En fazla 5 resim ekleyebilirsiniz.");
+          return;
+        }
+        data.images.push({ src: imageSrc, description: "" });
+
+        const imageDiv = document.createElement("div");
+        imageDiv.style.position = "relative";
+        imageDiv.style.width = "120px";
+        imageDiv.style.marginBottom = "10px";
+
+        imageDiv.innerHTML = `
+          <img src="${imageSrc}" style="width: 100%; height: 100%; object-fit: cover;">
+          <button style="position: absolute; top: 0; right: 0; background-color: red; color: white; border: none; font-size: 12px; cursor: pointer;">X</button>
+          <textarea placeholder="Fotoğraf açıklaması" style="width: 100%; margin-top: 5px;"></textarea>
+        `;
+
+        const removeButton = imageDiv.querySelector("button");
+        removeButton.addEventListener("click", () => {
+          const index = data.images.findIndex(image => image.src === imageSrc);
+          if (index > -1) data.images.splice(index, 1);
+          imageDiv.remove();
+        });
+
+        const descriptionField = imageDiv.querySelector("textarea");
+        descriptionField.addEventListener("input", (e) => {
+          const index = data.images.findIndex(image => image.src === imageSrc);
+          if (index > -1) data.images[index].description = e.target.value;
+        });
+
+        imagePreview.appendChild(imageDiv);
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+
+  saveMapBtn.addEventListener("click", () => {
+    const markersData = [];
+    markerImages.forEach((value, marker) => {
+      const markerStyle = window.getComputedStyle(marker);
+      const left = parseFloat(markerStyle.left);
+      const top = parseFloat(markerStyle.top);
+      markersData.push({
+        left: left.toFixed(2),
+        top: top.toFixed(2),
+        description: value.description,
+        images: value.images,
+      });
+    });
+
+    console.log("Harita Kaydedildi:", JSON.stringify(markersData));
+    alert("Harita başarıyla kaydedildi!");
+  });
+
+  function handleDragMove(e) {
+    if (dragging) {
+      e.preventDefault();
+      const rect = imageContainer.getBoundingClientRect();
+
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+      let x = ((clientX - rect.left) / rect.width) * 100;
+      let y = ((clientY - rect.top) / rect.height) * 100;
+
+      x = Math.max(0, Math.min(100, x));
+      y = Math.max(0, Math.min(100, y));
+
+      dragging.style.left = x + "%";
+      dragging.style.top = y + "%";
+
+      coordinatesDisplay.textContent = `Koordinatlar: (left: ${x.toFixed(2)}%, top: ${y.toFixed(2)}%)`;
+    }
+  }
+
+  function handleDragEnd() {
+    if (dragging) {
+      dragging.style.cursor = "grab";
+      dragging = null;
+    }
+  }
+</script>
+
+</body>
+</html>
+
+
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Paneli: Konum Ekleme</title>
+  <style>
     body {
       font-family: Arial, sans-serif;
       margin: 0;
@@ -136,26 +537,22 @@
 
 <h1 style="text-align: center;">Admin Paneli: Görsel Üzerine Konum Ekleme</h1>
 
-<!-- Resim Yükleme -->
 <div class="admin-panel">
   <input type="file" id="image-input" accept="image/*" style="display: none;">
   <button class="add-image-btn" id="upload-image-btn">Yeni Resim Yükle</button>
   <button class="add-image-btn" id="remove-image-btn">Resmi Kaldır</button>
 </div>
 
-<!-- Resim Konteyneri -->
 <div class="image-container" id="image-container">
   <img src="" alt="Harita Görseli" id="current-image">
 </div>
 
-<!-- Admin Paneli -->
 <div class="admin-panel">
   <button class="add-marker-btn" id="add-marker-btn" disabled>Konum Ekle</button>
   <button class="add-image-btn" id="save-map-btn" disabled>Haritayı Kaydet</button>
   <div class="coordinates" id="coordinates">Koordinatlar: (left: 0, top: 0)</div>
 </div>
 
-<!-- Popup -->
 <div class="popup" id="popup">
   <textarea id="popup-description" placeholder="Açıklama ekle" rows="4" style="width: 100%; margin-bottom: 10px;"></textarea>
   <div class="image-preview" id="image-preview"></div>
@@ -165,7 +562,6 @@
   <button class="add-image-btn" id="close-popup">Kapat</button>
 </div>
 
-<!-- Kaydedilen Haritalar Bölümü -->
 <div class="saved-maps" id="saved-maps">
   <h2>Kaydedilen Haritalar</h2>
   <div id="maps-list"></div>
@@ -406,7 +802,6 @@
     renderImagePreview(images);
   };
 
-  // Load saved maps on page load
   function loadSavedMaps() {
     savedMapData.forEach((mapData, index) => {
       const mapElement = document.createElement("div");
