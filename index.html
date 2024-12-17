@@ -182,18 +182,40 @@ function renderImages(images) {
 
 // Marker sürükleme
 function enableDragging(marker) {
-  marker.addEventListener("mousedown", (e) => {
+  marker.addEventListener("mousedown", startDrag);
+  marker.addEventListener("touchstart", startDrag, { passive: false }); // Pasif mod kapatıldı
+
+  function startDrag(e) {
+    e.preventDefault(); // Dokunma sırasında tarayıcı kaydırmasını engelle
+
     const rect = imageContainer.getBoundingClientRect();
+
     function move(e) {
-      const x = ((e.clientX - rect.left) / rect.width) * 100;
-      const y = ((e.clientY - rect.top) / rect.height) * 100;
+      e.preventDefault(); // Kaydırmayı tamamen engelle
+      const clientX = (e.clientX !== undefined) ? e.clientX : e.touches[0].clientX;
+      const clientY = (e.clientY !== undefined) ? e.clientY : e.touches[0].clientY;
+
+      const x = Math.min(Math.max(0, ((clientX - rect.left) / rect.width) * 100), 100);
+      const y = Math.min(Math.max(0, ((clientY - rect.top) / rect.height) * 100), 100);
+
       marker.style.left = `${x}%`;
       marker.style.top = `${y}%`;
     }
+
+    function stopDrag() {
+      document.removeEventListener("mousemove", move);
+      document.removeEventListener("mouseup", stopDrag);
+      document.removeEventListener("touchmove", move);
+      document.removeEventListener("touchend", stopDrag);
+    }
+
     document.addEventListener("mousemove", move);
-    document.addEventListener("mouseup", () => document.removeEventListener("mousemove", move));
-  });
+    document.addEventListener("mouseup", stopDrag);
+    document.addEventListener("touchmove", move, { passive: false });
+    document.addEventListener("touchend", stopDrag);
+  }
 }
+
 
 // Popup hareket ettirme işlemi
 let isDragging = false;
