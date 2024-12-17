@@ -64,6 +64,7 @@
   <div class="text-center mt-3">
     <input type="text" id="map-name" class="form-control mb-2" placeholder="Harita Adı Girin">
     <button class="btn btn-success" id="add-marker-btn" disabled>Konum Ekle</button>
+    <button class="btn btn-danger" id="remove-marker-btn" disabled>Konum Sil</button>
     <button class="btn btn-info" id="save-map-btn" disabled>Haritayı Kaydet</button>
   </div>
 </div>
@@ -79,11 +80,12 @@
 </div>
 
 <script>
-  const uploadImageBtn = document.getElementById("upload-image-btn");
+const uploadImageBtn = document.getElementById("upload-image-btn");
 const removeImageBtn = document.getElementById("remove-image-btn");
 const imageInput = document.getElementById("image-input");
 const currentImage = document.getElementById("current-image");
 const addMarkerBtn = document.getElementById("add-marker-btn");
+const removeMarketBtn = document.getElementById("remove-marker-btn")
 const saveMapBtn = document.getElementById("save-map-btn");
 const imageContainer = document.getElementById("image-container");
 const popup = document.getElementById("popup");
@@ -111,6 +113,7 @@ imageInput.addEventListener("change", () => {
     currentImage.src = reader.result;
     currentImage.classList.remove("d-none");
     addMarkerBtn.disabled = false;
+    removeMarketBtn.disabled = false;
     saveMapBtn.disabled = false;
     removeImageBtn.disabled = false;
 
@@ -124,6 +127,7 @@ removeImageBtn.addEventListener("click", () => {
   currentImage.src = "";
   currentImage.classList.add("d-none");
   addMarkerBtn.disabled = true;
+  removeMarketBtn.disabled = true;
   saveMapBtn.disabled = true;
   removeImageBtn.disabled = true;
   clearMarkers();
@@ -134,6 +138,13 @@ addMarkerBtn.addEventListener("click", () => {
   const marker = createMarker("50%", "50%");
   imageContainer.appendChild(marker);
   enableDragging(marker);
+});
+// Marker silme
+removeMarketBtn.addEventListener("click", () => {
+  const lastMarker = imageContainer.querySelector(".gps-marker");
+  if (lastMarker) {
+    lastMarker.remove();
+  }
 });
 
 // Marker oluşturma
@@ -183,6 +194,40 @@ function enableDragging(marker) {
     document.addEventListener("mouseup", () => document.removeEventListener("mousemove", move));
   });
 }
+
+// Popup hareket ettirme işlemi
+let isDragging = false;
+let offsetX, offsetY;
+
+popup.addEventListener("mousedown", (e) => {
+  isDragging = true;
+  const rect = popup.getBoundingClientRect();
+  offsetX = e.clientX - rect.left;
+  offsetY = e.clientY - rect.top;
+
+  // Popup hareketini engellemek için text seçimi devre dışı
+  popup.style.userSelect = "none";
+});
+
+document.addEventListener("mousemove", (e) => {
+  if (isDragging) {
+    // Yeni pozisyonu hesapla
+    const x = e.clientX - offsetX;
+    const y = e.clientY - offsetY;
+
+    // Popup konumunu güncelle
+    popup.style.left = `${x}px`;
+    popup.style.top = `${y}px`;
+  }
+});
+
+document.addEventListener("mouseup", () => {
+  isDragging = false;
+
+  // Popup hareketi bitince text seçimini geri getir
+  popup.style.userSelect = "auto";
+});
+
 
 // Popup resim ekleme
 addPopupImage.addEventListener("click", () => {
@@ -293,6 +338,7 @@ window.loadMap = (index) => {
   });
 
   addMarkerBtn.disabled = false;
+  removeMarketBtn.disabled = false;
   saveMapBtn.disabled = false;
   removeImageBtn.disabled = false;
 };
@@ -306,6 +352,7 @@ window.deleteMap = (index, button) => {
   currentImage.src = "";
   currentImage.classList.add("d-none");
   addMarkerBtn.disabled = true;
+  removeMarketBtn.disabled = true;
   saveMapBtn.disabled = true;
   removeImageBtn.disabled = true;
 };
