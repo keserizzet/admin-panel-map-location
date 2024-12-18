@@ -5,49 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Harita Yönetim Paneli</title>
   <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    .image-container {
-      position: relative;
-      border: 2px solid #ccc;
-      max-width: 100%;
-    }
-    .gps-marker {
-      position: absolute;
-      width: 30px;
-      height: 30px;
-      cursor: grab;
-      transform: translate(-50%, -50%);
-    }
-    .gps-marker svg {
-      width: 30px;
-      height: 30px;
-      fill: #dc3545;
-    }
-    .popup {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: white;
-      border: 1px solid #ccc;
-      box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
-      padding: 20px;
-      display: none;
-      z-index: 1000;
-    }
-    .image-preview img {
-      width: 50px;
-      height: 50px;
-      object-fit: cover;
-      margin: 5px;
-    }
-    .remove-image {
-      cursor: pointer;
-      color: red;
-      font-size: 12px;
-      text-align: center;
-    }
-  </style>
+  <link rel="stylesheet" href="style.css">
+  <script src="main.js" defer></script>
 </head>
 <body>
 <div class="container mt-4">
@@ -69,319 +28,32 @@
   </div>
 </div>
 
-<div class="popup" id="popup">
-  <h5>Konum Bilgisi</h5>
-  <textarea id="popup-description" class="form-control mb-2" placeholder="Açıklama ekleyin"></textarea>
-  <input type="file" id="popup-image-input" accept="image/*" class="mb-2">
-  <button class="btn btn-sm btn-primary mb-2" id="add-popup-image">Resim Ekle</button>
-  <div class="image-preview d-flex flex-wrap" id="image-preview"></div>
-  <button class="btn btn-success" id="save-popup">Kaydet</button>
-  <button class="btn btn-secondary" id="close-popup">Kapat</button>
+<div class="container mt-4">
+  <!-- Sabit Düzenleme Alanı -->
+  <div class="fixed-editor border p-3 mt-3" id="marker-editor" style="display: none;">
+    <h5>Konum Bilgisi Düzenle</h5>
+    <textarea id="editor-description" class="form-control mb-2" placeholder="Açıklama ekleyin"></textarea>
+    <input type="file" id="editor-image-input" accept="image/*" class="mb-2">
+    <button class="btn btn-sm btn-primary mb-2" id="editor-add-image">Resim Ekle</button>
+    <div class="image-preview d-flex flex-wrap" id="editor-image-preview"></div>
+    
+    <!-- Soru-Cevap Alanı -->
+    <div class="form-group mt-3">
+      <label for="question-input">Soru:</label>
+      <input type="text" id="question-input" class="form-control mb-2" placeholder="Bir soru yazın">
+      <label for="answer-input">Cevap:</label>
+      <textarea id="answer-input" class="form-control mb-2" placeholder="Cevap yazın"></textarea>
+      <button class="btn btn-sm btn-primary" id="add-question-answer">Soru-Cevap Ekle</button>
+    </div>
+    <div id="question-answer-list" class="mt-3"></div>
+
+    <button class="btn btn-success" id="editor-save">Kaydet</button>
+    <button class="btn btn-secondary" id="editor-clear">Kapat</button>
+  </div>
 </div>
 
-<script>
-const uploadImageBtn = document.getElementById("upload-image-btn");
-const removeImageBtn = document.getElementById("remove-image-btn");
-const imageInput = document.getElementById("image-input");
-const currentImage = document.getElementById("current-image");
-const addMarkerBtn = document.getElementById("add-marker-btn");
-const removeMarketBtn = document.getElementById("remove-marker-btn")
-const saveMapBtn = document.getElementById("save-map-btn");
-const imageContainer = document.getElementById("image-container");
-const popup = document.getElementById("popup");
-const popupDescription = document.getElementById("popup-description");
-const popupImageInput = document.getElementById("popup-image-input");
-const addPopupImage = document.getElementById("add-popup-image");
-const imagePreview = document.getElementById("image-preview");
-const savePopup = document.getElementById("save-popup");
-const closePopup = document.getElementById("close-popup");
-
-const savedMaps = document.createElement("div");
-savedMaps.classList.add("mt-4");
-document.querySelector(".container").appendChild(savedMaps);
-
-let markers = [];
-let activeMarker = null;
-let savedMapData = JSON.parse(localStorage.getItem("savedMapData")) || [];
-
-// Resim yükleme
-uploadImageBtn.addEventListener("click", () => imageInput.click());
-imageInput.addEventListener("change", () => {
-  const file = imageInput.files[0];
-  const reader = new FileReader();
-  reader.onload = () => {
-    currentImage.src = reader.result;
-    currentImage.classList.remove("d-none");
-    addMarkerBtn.disabled = false;
-    removeMarketBtn.disabled = false;
-    saveMapBtn.disabled = false;
-    removeImageBtn.disabled = false;
-
-    document.getElementById("map-name").value = "";
-  };
-  reader.readAsDataURL(file);
-});
-
-// Resmi kaldırma
-removeImageBtn.addEventListener("click", () => {
-  currentImage.src = "";
-  currentImage.classList.add("d-none");
-  addMarkerBtn.disabled = true;
-  removeMarketBtn.disabled = true;
-  saveMapBtn.disabled = true;
-  removeImageBtn.disabled = true;
-  clearMarkers();
-});
-
-// Marker ekleme
-addMarkerBtn.addEventListener("click", () => {
-  const marker = createMarker("50%", "50%");
-  imageContainer.appendChild(marker);
-  enableDragging(marker);
-});
-// Marker silme
-removeMarketBtn.addEventListener("click", () => {
-  const lastMarker = imageContainer.querySelector(".gps-marker");
-  if (lastMarker) {
-    lastMarker.remove();
-  }
-});
-
-// Marker oluşturma
-function createMarker(left, top) {
-  const marker = document.createElement("div");
-  marker.classList.add("gps-marker");
-  marker.style.left = left;
-  marker.style.top = top;
-  marker.innerHTML = `
-    <svg viewBox="0 0 24 24">
-      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5 14.5 7.62 14.5 9 13.38 11.5 12 11.5z"/>
-    </svg>`;
-  marker.dataset.images = JSON.stringify([]);
-  marker.addEventListener("click", () => {
-    activeMarker = marker;
-    popupDescription.value = marker.dataset.description || "";
-    renderImages(JSON.parse(marker.dataset.images));
-    popup.style.display = "block";
-  });
-  markers.push(marker);
-  return marker;
-}
-function renderImages(images) {
-  imagePreview.innerHTML = ""; // Önceki resimleri temizle
-  images.forEach(imgSrc => {
-    const div = document.createElement("div");
-    div.innerHTML = `
-      <img src="${imgSrc}" alt="Eklenen Resim">
-      <div class="remove-image" style="cursor: pointer; color: red; font-size: 12px;">Sil</div>
-    `;
-    div.querySelector(".remove-image").onclick = () => div.remove();
-    imagePreview.appendChild(div);
-  });
-}
-
-// Marker sürükleme
-function enableDragging(marker) {
-  marker.addEventListener("mousedown", startDrag);
-  marker.addEventListener("touchstart", startDrag, { passive: false }); // Pasif mod kapatıldı
-
-  function startDrag(e) {
-    e.preventDefault(); // Dokunma sırasında tarayıcı kaydırmasını engelle
-
-    const rect = imageContainer.getBoundingClientRect();
-
-    function move(e) {
-      e.preventDefault(); // Kaydırmayı tamamen engelle
-      const clientX = (e.clientX !== undefined) ? e.clientX : e.touches[0].clientX;
-      const clientY = (e.clientY !== undefined) ? e.clientY : e.touches[0].clientY;
-
-      const x = Math.min(Math.max(0, ((clientX - rect.left) / rect.width) * 100), 100);
-      const y = Math.min(Math.max(0, ((clientY - rect.top) / rect.height) * 100), 100);
-
-      marker.style.left = `${x}%`;
-      marker.style.top = `${y}%`;
-    }
-
-    function stopDrag() {
-      document.removeEventListener("mousemove", move);
-      document.removeEventListener("mouseup", stopDrag);
-      document.removeEventListener("touchmove", move);
-      document.removeEventListener("touchend", stopDrag);
-    }
-
-    document.addEventListener("mousemove", move);
-    document.addEventListener("mouseup", stopDrag);
-    document.addEventListener("touchmove", move, { passive: false });
-    document.addEventListener("touchend", stopDrag);
-  }
-}
+<div id="saved-maps-container"></div>
 
 
-// Popup hareket ettirme işlemi
-let isDragging = false;
-let offsetX, offsetY;
-
-popup.addEventListener("mousedown", (e) => {
-  isDragging = true;
-  const rect = popup.getBoundingClientRect();
-  offsetX = e.clientX - rect.left;
-  offsetY = e.clientY - rect.top;
-
-  // Popup hareketini engellemek için text seçimi devre dışı
-  popup.style.userSelect = "none";
-});
-
-document.addEventListener("mousemove", (e) => {
-  if (isDragging) {
-    // Yeni pozisyonu hesapla
-    const x = e.clientX - offsetX;
-    const y = e.clientY - offsetY;
-
-    // Popup konumunu güncelle
-    popup.style.left = `${x}px`;
-    popup.style.top = `${y}px`;
-  }
-});
-
-document.addEventListener("mouseup", () => {
-  isDragging = false;
-
-  // Popup hareketi bitince text seçimini geri getir
-  popup.style.userSelect = "auto";
-});
-
-
-// Popup resim ekleme
-addPopupImage.addEventListener("click", () => {
-  if (imagePreview.children.length >= 5) return alert("En fazla 5 resim eklenebilir.");
-  const file = popupImageInput.files[0];
-  if (file) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const div = document.createElement("div");
-      div.innerHTML = `<img src="${reader.result}"><div class="remove-image">Sil</div>`;
-      div.querySelector(".remove-image").onclick = () => div.remove();
-      imagePreview.appendChild(div);
-    };
-    reader.readAsDataURL(file);
-  }
-});
-
-// Popup kayıt işlemi
-savePopup.addEventListener("click", () => {
-  activeMarker.dataset.description = popupDescription.value;
-  activeMarker.dataset.images = JSON.stringify(
-    Array.from(imagePreview.querySelectorAll("img")).map(img => img.src)
-  );
-  popup.style.display = "none";
-});
-
-// Popup kapatma
-closePopup.addEventListener("click", () => popup.style.display = "none");
-
-// Harita kaydetme
-saveMapBtn.addEventListener("click", () => {
-  const mapNameInput = document.getElementById("map-name");
-  const mapName = mapNameInput.value.trim();
-  if (!mapName) {
-    alert("Harita adı girilmelidir!");
-    return;
-  }
-
-  if (!currentImage.src) {
-    alert("Harita resmi yüklenmedi!");
-    return;
-  }
-  if (!currentImage.src) {
-    alert("Harita resmi yüklenmedi!");
-    return;
-  }
-
-  const mapData = {
-    name: mapName,
-    image: currentImage.src, // Harita resmi
-    markers: markers.map(marker => ({
-      left: marker.style.left,
-      top: marker.style.top,
-      description: marker.dataset.description || "",
-      images: JSON.parse(marker.dataset.images || "[]")
-    }))
-  };
-
-  // savedMapData'ya haritayı ekle
-  savedMapData.push(mapData);
-  localStorage.setItem("savedMapData", JSON.stringify(savedMapData));
-
-  // Yeni kaydedilen haritayı listele
-  displaySavedMap(mapData, savedMapData.length - 1);
-
-  alert("Harita başarıyla kaydedildi!");
-});
-
-// Marker'ları ve harita listesini temizleme
-function clearMarkers() {
-  markers.forEach(marker => marker.remove());
-  markers = [];
-}
-
-// Haritaları sayfada listeleme
-function loadSavedMaps() {
-  savedMaps.innerHTML = "";
-  savedMapData.forEach((mapData, index) => displaySavedMap(mapData, index));
-}
-
-function displaySavedMap(mapData, index) {
-  const mapElement = document.createElement("div");
-  mapElement.classList.add("saved-map", "border", "p-2", "mb-2");
-  mapElement.innerHTML = `
-  <div><strong>Harita Adı:</strong> ${mapData.name}</div>
-    <img src="${mapData.image}" alt="Saved Map" style="width: 100px; height: auto;">
-    <div>
-      <button class="btn btn-sm btn-info" onclick="loadMap(${index})">Düzenle</button>
-      <button class="btn btn-sm btn-danger" onclick="deleteMap(${index}, this)">Sil</button>
-    </div>
-  `;
-  savedMaps.appendChild(mapElement);
-}
-
-// Harita yükleme
-window.loadMap = (index) => {
-  const mapData = savedMapData[index];
-  currentImage.src = mapData.image;
-  currentImage.classList.remove("d-none");
-
-  clearMarkers();
-  mapData.markers.forEach(markerData => {
-    const marker = createMarker(markerData.left, markerData.top);
-    marker.dataset.description = markerData.description;
-    marker.dataset.images = JSON.stringify(markerData.images);
-    imageContainer.appendChild(marker);
-    enableDragging(marker);
-  });
-
-  addMarkerBtn.disabled = false;
-  removeMarketBtn.disabled = false;
-  saveMapBtn.disabled = false;
-  removeImageBtn.disabled = false;
-};
-
-// Harita silme
-window.deleteMap = (index, button) => {
-  savedMapData.splice(index, 1);
-  localStorage.setItem("savedMapData", JSON.stringify(savedMapData));
-  button.closest(".saved-map").remove();
-  clearMarkers();
-  currentImage.src = "";
-  currentImage.classList.add("d-none");
-  addMarkerBtn.disabled = true;
-  removeMarketBtn.disabled = true;
-  saveMapBtn.disabled = true;
-  removeImageBtn.disabled = true;
-};
-
-// Sayfa yüklenirken kaydedilen haritaları göster
-loadSavedMaps();
-
-</script>
 </body>
 </html>
